@@ -57,7 +57,7 @@ struct KeyValue {
 }
 ```
 
-And packs these structs into an array, sorting elements by input key. Then serialize the resulting array with encoder.
+And pack these structs into an array, sorting elements by input key. Then serialize the resulting array with encoder.
 
 ``` golang
 struct SerializedKvList {
@@ -147,3 +147,5 @@ Creates a .cxo file in current directory
 - populate testdata with random directories and files (size min, size max; number of files, max directory depth, etc)
 - compute the manifest file
 - then run "manifest verify" function on directory and check that all the file names exist, the file size is correct and that the hashes of the files match
+
+

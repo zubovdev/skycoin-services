@@ -41,6 +41,55 @@ Figure out how to have executable add itself to system startup
 
 6> Get list of discs and disc size
 
+
+##Golang TraceRoute utility
+
+Use one of the following 
+- https://github.com/kalbhor/tracesite
+- https://pkg.go.dev/github.com/aeden/traceroute?utm_source=godoc (github.com/aeden/traceroute)
+
+Check if traceroute is using
+- ICMP, UDP, TCP (verify that it is using UDP)
+
+Get results of traceroute back in JSON or machine readable format
+- time in ms
+- ip for each host
+- the hop count
+- etc
+
+The parameters must be fed in as a struct (startin host, destination host, hop count, max latency, protocol=UDP, etc)
+- the results should be stored in a "results struct"
+- there should be a machine readable (JSON) print out of the results struct
+- the results struct should include unix, int64 time in seconds, when test was performed
+- there should be field for "source ip"
+
+So we have 
+
+```golang
+struct TraceRouteInput {
+	SourceHostIP String //the host that made request (can ignore)
+	SourceHostPort int
+	DestinationIp string
+	DesinationPort string
+	
+	Time int64 //int64 unix time
+	Protocol String //UDP
+	MaxLatency int //
+	MaxHops int
+	Retries int
+	//etc
+}
+
+struct TraceRouteResult {
+	//etc, return data goes here
+}
+
+use github.com/skycoin/skycoin, src/cipher/encoder for serializing the input and result structs to []byte
+
+Also have a  function for serializing the results to JSON
+
+```
+
 ## Use Golang to get network information
 
 7> Get public ip address

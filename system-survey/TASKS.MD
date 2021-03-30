@@ -44,6 +44,10 @@ Figure out how to have executable add itself to system startup
 
 ##Golang TraceRoute utility
 
+Put code in system-survey/cmd/traceroute in sub-folder
+- options for -json out
+- output should print the input string (options) and also the output struct/return
+
 Use one of the following 
 - https://github.com/kalbhor/tracesite
 - https://pkg.go.dev/github.com/aeden/traceroute?utm_source=godoc (github.com/aeden/traceroute)

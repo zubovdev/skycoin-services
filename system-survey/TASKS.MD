@@ -39,10 +39,13 @@ Use this library
 - operating system
 - operating version
 - block devices (size, storage, etc)
+- all network adapters
+- PCI information
 
-List of GPUs
-List of audio devices
-
+- List of GPUs
+-List of audio devices
+  
+ETC. Get everything in a printout, in JSON format
 
 4> Get computer ram
 

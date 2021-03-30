@@ -32,8 +32,17 @@ Figure out how to have executable add itself to system startup
 ## Use golang to get information about computer
 
 3> Get CPU architecture (ARM, x64, etc)
-- and operating system
+
+Use this library
+- https://github.com/jaypipes/ghw
+
+- operating system
 - operating version
+- block devices (size, storage, etc)
+
+List of GPUs
+List of audio devices
+
 
 4> Get computer ram
 

@@ -85,7 +85,7 @@ func main() {
 }
 
 func getTotalPages(link string) (string, int, error) {
-	fmt.Println(link)
+	// fmt.Println(link)
 	links := strings.Split(link, ",")
 	for _, l := range links {
 		ll := strings.Split(l, ";")

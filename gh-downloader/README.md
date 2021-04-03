@@ -22,15 +22,15 @@ go install ./...
 # go to the dir where you'd like to store the download repos
 cd $HOME/Download/skycoin_backup/
 
-gh_downloader -org skycoin -o skycoin
+gh-downloader -org skycoin
 ```
 
 ### Download a private organization
 
-To download repos in a private organization, the following requirements must be met:
+To download repos of a private organization, the following requirements must be met:
 
 - A github account that has access to the organization
-- A github access token, which will be used to list repos in the private organization.
+- A github access token, which will be used to access repos in the private organization.
 
 #### Generate access token
 
@@ -41,24 +41,21 @@ Go to the `Settings` of your github account, then `Developer settings` > `Person
 For example, download repos from `github.com/skycoinpro`
 
 ```sh
-gh_downloader -org skycoinpro -p -token $TOKEN -o skycoinpro
+gh-downloader -org skycoinpro -token $TOKEN
 ```
 
 The value of `$TOKEN` is the access token we generated before.
 
 ## Get repo url list only
 
-If only need to get the repo url list of an organization, for example, get the repo list of github.com/skycoin:
+If we only need to get the repo urls of an organization, for example, get the repo list of github.com/skycoin:
 
 ```sh
-gh_downloader -org skycoin -urls
+gh-downloader -org skycoin -urls-only
 ```
 
 If the organization is **private**, for example, get the repo list of github.com/skycoinpro:
 
 ```sh
-gh_downloader -org skycoinorg -p -t $TOKEN -urls
+gh-downloader -org skycoinorg -t $TOKEN -urls-only
 ```
-
-## TODO
-- Write code to check if the org is private first, then do correspoinding check base on the result before trying to get org urls and clone diectly.

@@ -6,20 +6,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/user"
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
+	"syscall"
 	"time"
-	"github.com/urfave/cli/v2"
+	"unsafe"
+
 	"github.com/skycoin/skycoin/src/cipher/encoder"
+	"github.com/urfave/cli/v2"
 )
 
-
-func initCLI() *cli.App{
-	filesList = processDirAndGenerateMeta()
+func initCLI() *cli.App {
+	filesList = processDirAndGenerateMeta(".")
 
 	app := cli.NewApp()
 	app.Name = "manifest"
@@ -31,142 +35,148 @@ func initCLI() *cli.App{
 		cli.ShowAppHelpAndExit(cnx, 0)
 		return nil
 	}
-	 
+
 	sort.Sort(cli.FlagsByName(app.Flags))
-	cli.VersionFlag = &cli.BoolFlag {
-		Name: "print-version",
+	cli.VersionFlag = &cli.BoolFlag{
+		Name:  "print-version",
 		Usage: "print version",
 	}
 
 	return app
 }
 
-func addCLICommands(app *cli.App){
+func addCLICommands(app *cli.App) {
 	app.Commands = []*cli.Command{
 		{
-			Name: "init",
-			Usage: "initialize tool environment by create the .cxo folder",
-			UsageText: "create the manifest foler .cxo in current directory",
+			Name:      "init",
+			Usage:     "initialize tool environment by create the .cxo folder",
+			UsageText: "create the manifest folder .cxo in current directory",
 			Action: func(cnx *cli.Context) error {
-				createCXOdir()
-				return nil
+				err := createFolder(".cxo")
+				if err == nil {
+					fmt.Println("Create .cxo foler in current directory: ")
+				}
+				return err
 			},
 		},
 		{
-			Name: "commit",
-			Usage: "commit all the files' metadatum into the .cxo file",
+			Name:      "commit",
+			Usage:     "commit all the files' metadatum into the .cxo file",
 			UsageText: "commit all the metadata files into the .cxo folder",
 			Flags: []cli.Flag{
-				&cli.BoolFlag {
-					Name: "print-json",
+				&cli.BoolFlag{
+					Name:  "print-json",
 					Value: false,
 					Usage: "print files in the directory in json ",
 				},
-				&cli.BoolFlag {
-					Name: "meta",
+				&cli.BoolFlag{
+					Name:  "meta",
 					Value: false,
-					Usage: "add metadata section to the file list",
+					Usage: "add metadata section in json",
 				},
 			},
 			Action: func(cnx *cli.Context) error {
-				// metaFlag := false
-				// if cnx.Bool("meta"){
-				// 	metaFlag = true
-				// }
-				if !isCXOFolderExist(){
-					panic("folder ./cxo does not exist")
+				metaFlag := false
+				if cnx.Bool("meta") {
+					if !cnx.Bool("print-json") {
+						cli.ShowAppHelpAndExit(cnx, 0)
+					}
+					metaFlag = true
+				}
+				cxoPath := currentDir + "/.cxo/"
+				if !isFolderExist(cxoPath) {
+					fmt.Println("please use 'manifest init' command before 'manifest commit'")
+					os.Exit(1)
 				}
 
-				err := os.MkdirAll("./.cxo/checkpoints/",os.ModePerm)
+				err := os.MkdirAll("./.cxo/checkpoints/", os.ModePerm)
 				if err != nil {
 					panic(err)
 				}
-				cxoFileName = generateCXOFilename()
-				
+				cxoFileName := currentDir + "/.cxo/checkpoints/" + strconv.FormatInt(time.Now().Unix(), 10) + ".cxo"
+
 				cxoFile, err := os.OpenFile(cxoFileName, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 				if err != nil {
 					panic(err)
 				}
 				defer cxoFile.Close()
 
-				mapList := generateFilesMaps(filesList)
-				serializedkeyValueList := serializeMaps(mapList)
-				serializedListResult := encoder.Serialize(*serializedkeyValueList)
+				var manifestOuputBody ManifestOuputBody
+				manifestBody := getManifestBody(filesList)
+				manifestOuputBody.ManifestBody = *manifestBody
+				manifestOuputBody.ManifestHeader = *getManifestDirectoryHeader(manifestBody)
+				manifestOuputBody.ChunkHashList = (*filesList).fileschunkslist
 
-				_, err = cxoFile.Write(serializedListResult)
+				serializedOuputBody := encoder.Serialize(manifestOuputBody)
+
+				_, err = cxoFile.Write(serializedOuputBody)
 				if err != nil {
 					panic(err)
 				}
-				if cnx.Bool("print-json"){
-					printFilesInJson(filesList)
+				if cnx.Bool("print-json") {
+					printFilesInJson(filesList, &manifestOuputBody.ManifestHeader, metaFlag)
 				}
-				// header := getManifestHeaderMetaData()
 
-				// body := getManifestBody(filesList)
-				// directoryHeader := getManifestDirectoryHeader(serializedkeyValueList, body)
-				// OuputBody := ManifestOuputBody{
-				// 	ManifestHeader: *directoryHeader,
-				// 	ManifestBody: *body,
-				// }
-
-				// serializedBodyResult := encoder.Serialize(OuputBody)
-				// _, err = cxoFile.Write(serializedBodyResult)
-				// if err != nil {
-				// 	panic(err)
-				// }
 				return nil
 			},
 		},
 	}
 }
 
-func main(){
-	defer func() {  
-		if err := recover(); err != nil {
-		   fmt.Println(err)
-		   fmt.Println("please use 'manifest init' command before 'manifest commit'") 
-		   os.Exit(1)
-		}
-	}()
+func main() {
 
+	currentDir = getCurrentDir()
 	app := initCLI()
 
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
-	} 
+	}
 
 }
 
-func processDirAndGenerateMeta() *FilesMetaList {
-	var FilesAndDirectories FilesMetaList
+func processDirAndGenerateMeta(dir string) *FilesInfoList {
+	var FilesAndDirectories FilesInfoList
 	var directories []string
 	var directoriesSize []int
 	var files []string
 	var filesSize []int
 	var filesHash [][]byte
-
-	err := filepath.Walk(".",
-    func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			directories = append(directories, path)
-			dirSize,err := getDirectorySize(path)
+	var fileschunksList []FileChunkHashList
+	var filesMetaList ManifestDirectMetaList
+	err := filepath.Walk(dir,
+		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
-			directoriesSize = append(directoriesSize, dirSize)
-		}else{
-			files = append(files, path)
-			filesSize = append(filesSize, int(info.Size()))
-			filesHash = append(filesHash, []byte(hashFileAndEncoding(path)))
-		}
-		return nil
-	})
+
+			if info.IsDir() {
+				if info.Name() == ".cxo" {
+					return filepath.SkipDir
+				}
+				directories = append(directories, path)
+				dirSize, err := getDirectorySize(path)
+				if err != nil {
+					return err
+				}
+				directoriesSize = append(directoriesSize, dirSize)
+			} else if info.Name() != appName {
+				files = append(files, path)
+				filesSize = append(filesSize, int(info.Size()))
+				filesHash = append(filesHash, []byte(hashFileAndEncoding(path)))
+				chunkshashes, err := getChunkHashes(path)
+				if err != nil {
+					return err
+				}
+				fileschunksList = append(fileschunksList, *chunkshashes)
+
+				filesMetaList = append(filesMetaList, getFileMeta(path))
+			}
+
+			return nil
+		})
 	if err != nil {
-		log.Println(err)
+		log.Fatal(err)
 	}
 
 	FilesAndDirectories.directoryNames = directories
@@ -174,11 +184,47 @@ func processDirAndGenerateMeta() *FilesMetaList {
 	FilesAndDirectories.fileSizes = filesSize
 	FilesAndDirectories.fileHashes = filesHash
 	FilesAndDirectories.diretorySizes = directoriesSize
+	FilesAndDirectories.fileschunkslist = fileschunksList
+	FilesAndDirectories.filesMetaList = filesMetaList
 	return &FilesAndDirectories
 }
 
- 
-func getDirectorySize(directory string) (int,error){
+func getChunkHashes(filepath string) (*FileChunkHashList, error) {
+
+	var filechunks FileChunkHashList
+
+	file, err := os.Open(filepath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	bf := make([]byte, chunkSize)
+	hs := sha256.New()
+
+	for {
+		readTotal, err := file.Read(bf)
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+		if readTotal == 0 {
+			break
+		}
+
+		for readTotal < chunkSize {
+			readTotal = readTotal + copy(bf[readTotal:], []byte{0x0000})
+		}
+
+		hs.Write(bf)
+		filechunks.ChunksHashes = append(filechunks.ChunksHashes, hs.Sum(nil))
+		hs.Reset()
+
+	}
+
+	return &filechunks, nil
+}
+
+func getDirectorySize(directory string) (int, error) {
 	totalSize := 0
 	err := filepath.Walk(directory,
 		func(path string, info os.FileInfo, err error) error {
@@ -186,101 +232,79 @@ func getDirectorySize(directory string) (int,error){
 				return err
 			}
 			if !info.IsDir() {
-				totalSize =+ int(info.Size())
-				
-			} 
+				totalSize = +int(info.Size())
+
+			}
 			return nil
 		})
-	return totalSize,err
+	return totalSize, err
 }
 
-func printFilesInJson(fList *FilesMetaList){
+func printFilesInJson(fList *FilesInfoList, dirHeader *ManifestDirectoryHeader, metaflag bool) {
 	var dirmeta DirectoryMetaList
-	var filemeta FileMetaList
-	 
-	for indx,fn := range (*fList).fileNames{
+	var filemeta FileDataList
+
+	for indx, fn := range (*fList).fileNames {
 		fh := (*fList).fileHashes[indx]
 		fs := (*fList).fileSizes[indx]
-		fileInfo := FileMeta{ fn, fs, fh }
+		meta := (*fList).filesMetaList[indx]
+		fileInfo := FileData{fn, fs, fh, &meta}
+		if !metaflag {
+			fileInfo = FileData{fn, fs, fh, nil}
+		}
+
 		filemeta = append(filemeta, fileInfo)
-		
+
 	}
 
-	for indx,dn := range (*fList).directoryNames{
+	for indx, dn := range (*fList).directoryNames {
 		ds := (*fList).diretorySizes[indx]
-		dirInfo := DirectoryMeta{ dn, ds }
+		dirInfo := DirectoryMeta{dn, ds}
 		dirmeta = append(dirmeta, dirInfo)
 	}
-	
+
 	sort.Sort(filemeta)
 	sort.Sort(dirmeta)
-	metadata := struct { 
-		Files  []FileMeta   `json:"files"`
-		Directories []DirectoryMeta `json:"directories"`
-	}{ filemeta,dirmeta }
+	metadata := struct {
+		DirectoryHeader ManifestDirectoryHeader `json:"directory header"`
+		Directories     []DirectoryMeta         `json:"directories"`
+		Files           []FileData              `json:"files"`
+	}{*dirHeader, dirmeta, filemeta}
 
 	jsons, err := json.MarshalIndent(metadata, "", "   ")
 	if err != nil {
 		panic(err)
-	}	
+	}
 	fmt.Println(string(jsons))
 }
 
-func generateFilesMaps(fList *FilesMetaList) []*map[string]string {
-	var filesHashMap map[string]string = make(map[string]string)
-	var fielsSizeMap map[string]string = make(map[string]string)
-	var directoriesSizeMap map[string]string = make(map[string]string)
-	var result []*map[string]string
-	filespath := (*fList).fileNames
-	directoriespath := (*fList).directoryNames
-
-	for indx,filehash := range (*fList).fileHashes{
-		filesHashMap[filespath[indx]] = string(filehash)
-	}
-
-	result = append(result, &fielsSizeMap)
-
-	for indx,filesize := range (*fList).fileSizes{
-		fielsSizeMap[filespath[indx]] = strconv.Itoa(filesize)
-	}
-	result = append(result, &filesHashMap)
-
-	for indx,dirSize := range (*fList).diretorySizes{
-		directoriesSizeMap[directoriespath[indx]] = strconv.Itoa(dirSize)
-	}
-	result = append(result, &directoriesSizeMap)
-
-	return result
-}
-
-func getManifestBody(fList *FilesMetaList) *ManifestDirectoryBody{
+func getManifestBody(fList *FilesInfoList) *ManifestDirectoryBody {
 
 	var result ManifestDirectoryBody
-	currentdir,_ := os.Getwd()
 
-	for indx,fname := range (*fList).fileNames{
+	for indx, fname := range (*fList).fileNames {
 		fsize := (*fList).fileSizes[indx]
 		fhash := (*fList).fileHashes[indx]
-		fullname := currentdir + "/" + fname
+		fullname := currentDir + "/" + fname
 		paths, fileName := filepath.Split(fullname)
-		manifestFile := ManifestFile {
-			Path: []byte(paths) ,
-			FileName: []byte(fileName),
-			Size: int64(fsize),
-			HashList: []HashType {{[]byte("base64,sha256"), fhash}},
+		manifestFile := ManifestFile{
+			Path:       []byte(paths),
+			FileName:   []byte(fileName),
+			Size:       int64(fsize),
+			HashList:   HashValue{[]byte("base64,sha256"), fhash},
 			MetaString: []byte{},
 		}
 		result.FileList = append(result.FileList, manifestFile)
 	}
 
-	for indx,dirname := range (*fList).directoryNames{
+	for indx, dirname := range (*fList).directoryNames {
 		dirsize := (*fList).diretorySizes[indx]
-		fullDirname := currentdir + "/" + dirname
-		manifestFile := ManifestFile {
-			Path: []byte(fullDirname) ,
-			FileName: nil,
-			Size: int64(dirsize),
-			HashList: []HashType {{[]byte("base64,sha256"), nil}},
+		fullDirname := currentDir + "/" + dirname
+		manifestFile := ManifestFile{
+			Path:       []byte(fullDirname),
+			FileName:   nil,
+			Size:       int64(dirsize),
+			HashList:   HashValue{[]byte("base64,sha256"), nil},
 			MetaString: []byte{},
 		}
 		result.FileList = append(result.FileList, manifestFile)
@@ -289,24 +313,36 @@ func getManifestBody(fList *FilesMetaList) *ManifestDirectoryBody{
 	return &result
 }
 
-func getManifestDirectoryHeader(serializedkvList *SerializedKvList, body *ManifestDirectoryBody) *ManifestDirectoryHeader {
+func getManifestDirectoryHeader(body *ManifestDirectoryBody) *ManifestDirectoryHeader {
 	var result ManifestDirectoryHeader
+	dataSize := 0
 
-	segLenth := len((*body).FileList)
-	version := []byte("1.0.0")
-	sequenceid := uint64(1)
-	createat := time.Now() 
-	bodySegmentLength := uint64(segLenth)  
-	bodyDataFileSize := uint64(3)
-	serializedMapList := serializedkvList
+	for _, manifile := range (*body).FileList {
+		if manifile.FileName != nil {
+			dataSize += int(manifile.Size)
+		}
+	}
+	segLenth := unsafe.Sizeof((*body).FileList)
+	version := []byte(versionNo)
+	sequenceid := uint64(getSequenceId())
+	createat := uint64(time.Now().Unix())
+	bodySegmentLength := uint64(segLenth)
+	bodyDataFileSize := uint64(dataSize)
+
+	user, err := user.Current()
+	if err != nil {
+		panic(err)
+	}
 
 	result = ManifestDirectoryHeader{
-		VersionString: version,
-		SequenceId: sequenceid,
-		CreatedAt: createat,
+		VersionString:     version,
+		SequenceId:        sequenceid,
+		Creator:           user.Name,
+		CreatedAt:         createat,
 		BodySegmentLength: bodySegmentLength,
-		BodyDataFileSize: bodyDataFileSize,
-		SerializedMapList: *serializedMapList,
+		BodyDataFileSize:  bodyDataFileSize,
+		MetaDataTags:      KeysValuesList{},
+		ChunkSize:         chunkSize,
 	}
 
 	return &result
@@ -315,91 +351,132 @@ func getManifestDirectoryHeader(serializedkvList *SerializedKvList, body *Manife
 func getManifestHeaderMetaData(header *ManifestDirectoryHeader) *ManifestHeaderMetaData {
 	var result ManifestHeaderMetaData
 
-	creationTime := time.Now().Unix()
-	user, err := user.Current()
-    if err != nil {
-        panic(err)
-    }
+	creationTime := (*header).CreatedAt
 
-	previousManifest := getPreviousManifest()
-	sequenceid := uint64(1)
+	filename, err := getPreviousManifest((*header).SequenceId)
+	if err != nil {
+		panic(err)
+	}
+	previousManifest := filename
 
 	serializedheader := encoder.Serialize(*header)
 	h := sha256.New()
-	id := base64.StdEncoding.EncodeToString(h.Sum(serializedheader))
+	h.Write(serializedheader)
+	id := base64.StdEncoding.EncodeToString(h.Sum(nil))
 
-	result = ManifestHeaderMetaData {
-		CreationTime: creationTime,
-		Creator: user.Name,
+	result = ManifestHeaderMetaData{
+		CreationTime:     creationTime,
+		Creator:          (*header).Creator,
 		PreviousManifest: previousManifest,
-		SequenceId: sequenceid,
-		UniqueId: id,
+		SequenceId:       (*header).SequenceId,
+		UniqueId:         id,
 	}
 	return &result
 }
- 
-func createCXOdir() {
-	folderName := ".cxo"
-	fmt.Println("Create .cxo foler in current directory: ")
-	os.Mkdir(folderName, 0777)
-	os.Chmod(folderName, 0777)
-}
 
-func serializeMaps(mapList []*map[string]string) *SerializedKvList{
-	var serializedkvList SerializedKvList
-	var kvList KeyValueList
-
-	for _,mapPointer := range mapList{
-		for key,value := range (*mapPointer){
-			kvList = append(kvList, KeyValueString{key,value})
-		}
+func createFolder(folderName string) error {
+	var err error
+	if isFolderExist(folderName) {
+		return nil
 	}
-
-	sort.Sort(kvList)
-	for _,pair := range kvList{
-		serializedkvList.Add(KeyValueByte{[]byte(pair.Key), []byte(pair.Value)})
+	err = os.Mkdir(folderName, 0777)
+	if err != nil {
+		log.Fatal(err)
 	}
-	return &serializedkvList
+	err = os.Chmod(folderName, 0777)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return err
 }
 
 func hashFileAndEncoding(filePath string) string {
-    f, err := os.Open(filePath)
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer f.Close()
+	f, err := os.Open(filePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
 
-    h := sha256.New()
-    if _, err := io.Copy(h, f); err != nil {
-        log.Fatal(err)
-    }
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		log.Fatal(err)
+	}
 
-    return  base64.StdEncoding.EncodeToString(h.Sum(nil))
+	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
 
-func generateCXOFilename() string {
-	dir,_ := os.Getwd()
-	cxofilen := dir + "/.cxo/checkpoints/" + strconv.FormatInt(time.Now().Unix(),10)  + ".cxo"
-    return cxofilen
+func isFolderExist(path string) bool {
+
+	_, err := os.Stat(path)
+	if err != nil {
+		if os.IsExist(err) {
+			return true
+		}
+		if os.IsNotExist(err) {
+			return false
+		}
+		fmt.Println(err)
+		return false
+	}
+	return true
 }
 
-func isCXOFolderExist() bool {
-	dir,_ := os.Getwd()
-	path := dir + "/.cxo/"
-    _, err := os.Stat(path)
-    if err != nil{
-        if os.IsExist(err){
-            return true
-        }
-        if os.IsNotExist(err){
-            return false
-        }
-        fmt.Println(err)
-        return false
-    }
-    return true
+func getPreviousManifest(currentSequenctId uint64) (string, error) {
+	var manifestOuputBody ManifestOuputBody
+	cxoFolderName := currentDir + "/.cxo/checkpoints/"
+	var filename string
+	files, _ := ioutil.ReadDir(cxoFolderName)
+	for _, file := range files {
+		filename = file.Name()
+		if strings.HasSuffix(filename, ".cxo") {
+			cxoFile, err := os.Open(cxoFolderName + filename)
+			if err != nil {
+				return "", err
+			}
+			defer cxoFile.Close()
+			fileBytes, err := ioutil.ReadAll(cxoFile)
+			if err != nil {
+				return "", err
+			}
+			_, err = encoder.DeserializeRaw(fileBytes, &manifestOuputBody)
+			if err != nil {
+				return "", err
+			}
+			if currentSequenctId == manifestOuputBody.ManifestHeader.SequenceId+1 {
+				break
+			}
+		}
+	}
+	return filename, nil
 }
 
-func getPreviousManifest() string {
-	return "14387988.cxo"
+func getSequenceId() int {
+	cxoFolderName := currentDir + "/.cxo/checkpoints/"
+	files, _ := ioutil.ReadDir(cxoFolderName)
+	count := 0
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), ".cxo") {
+			count++
+		}
+	}
+	return count
+}
+
+func getCurrentDir() string {
+	dir, _ := os.Getwd()
+	return dir
+}
+
+func getFileMeta(filename string) FileMeta {
+
+	var result FileMeta
+
+	fileInfo, _ := os.Stat(filename)
+	fStat := fileInfo.Sys().(*syscall.Stat_t)
+	result.LastModified = uint64(fileInfo.ModTime().Unix())
+	result.UnixPermission = fileInfo.Mode().String()
+	sec, _ := fStat.Ctim.Unix()
+	result.CreateAt = uint64(sec)
+
+	return result
 }

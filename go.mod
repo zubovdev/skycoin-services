@@ -7,6 +7,6 @@ require (
 	github.com/jaypipes/ghw v0.7.0 // indirect
 	github.com/shirou/gopsutil v3.21.3+incompatible // indirect
 	github.com/skycoin/skycoin v0.27.1
-	github.com/stretchr/testify v1.7.0 // indirect
+	github.com/stretchr/testify v1.7.0
 	github.com/urfave/cli/v2 v2.3.0
 )

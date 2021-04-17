@@ -17,14 +17,13 @@ const (
 type ManifestOuputBody struct {
 	ManifestHeader ManifestDirectoryHeader
 	ManifestBody   ManifestDirectoryBody
-	ChunkHashList  []FileChunkHashList
 }
 
 type ManifestFile struct {
 	Path       []byte
 	FileName   []byte
 	Size       int64
-	HashList   HashValue
+	HashList   FileHashList
 	MetaString []byte
 }
 
@@ -51,23 +50,25 @@ type ManifestHeaderMetaData struct {
 	UniqueId         string
 }
 
-type FileChunkHashList struct {
+type FileHashList struct {
+	// hash for the whole file
+	FileHash HashVariable
+	// hashes for the file chunks
 	ChunksHashes [][]byte
 }
 
-type HashValue struct {
+type HashVariable struct {
 	HashType []byte
 	Hash     []byte
 }
 
 type FilesInfoList struct {
-	directoryNames  []string
-	fileNames       []string
-	diretorySizes   []int
-	fileSizes       []int
-	fileHashes      [][]byte
-	fileschunkslist []FileChunkHashList
-	filesMetaList   ManifestDirectMetaList
+	directoryNames []string
+	fileNames      []string
+	diretorySizes  []int
+	fileSizes      []int
+	filesHashlist  []FileHashList
+	filesMetaList  ManifestDirectMetaList
 }
 
 type KeyValueByte struct {

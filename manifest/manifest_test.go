@@ -304,7 +304,7 @@ func testManifestOutput(t *testing.T, manifestFileDirList *[]ManifestFile, fList
 	var manifestDirList []ManifestFile
 	var outPutFileNames []string
 	var outPutDirNames []string
-	var outPutFileHashList [][]byte
+	var outPutFileHashList []FileHashList
 
 	for _, filedir := range *manifestFileDirList {
 		if filedir.FileName != nil {
@@ -315,7 +315,7 @@ func testManifestOutput(t *testing.T, manifestFileDirList *[]ManifestFile, fList
 	}
 
 	for _, file := range manifestFileList {
-		outPutFileHashList = append(outPutFileHashList, file.HashList.Hash)
+		outPutFileHashList = append(outPutFileHashList, file.HashList)
 	}
 
 	for _, file := range manifestFileList {
@@ -341,5 +341,5 @@ func testManifestOutput(t *testing.T, manifestFileDirList *[]ManifestFile, fList
 	}
 	require.Equal(t, fileNamesTest, outPutFileNames, "The two file name list should have the same content.")
 	require.Equal(t, dirNamesTest, outPutDirNames, "The two directory name list should have the same content.")
-	require.Equal(t, (*fList).fileHashes, outPutFileHashList, "The two hash list should have the same content.")
+	require.Equal(t, (*fList).filesHashlist, outPutFileHashList, "The two hash list should have the same content.")
 }

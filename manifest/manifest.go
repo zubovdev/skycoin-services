@@ -102,10 +102,8 @@ func addCLICommands(app *cli.App) {
 				defer cxoFile.Close()
 
 				var manifestOuputBody ManifestOuputBody
-				manifestBody := getManifestBody(filesList)
-				manifestOuputBody.ManifestBody = *manifestBody
-				manifestOuputBody.ManifestHeader = *getManifestDirectoryHeader(manifestBody)
-				manifestOuputBody.ChunkHashList = (*filesList).fileschunkslist
+				manifestOuputBody.ManifestBody = *getManifestBody(filesList)
+				manifestOuputBody.ManifestHeader = *getManifestDirectoryHeader(&manifestOuputBody.ManifestBody)
 
 				serializedOuputBody := encoder.Serialize(manifestOuputBody)
 
@@ -141,9 +139,10 @@ func processDirAndGenerateMeta(dir string) *FilesInfoList {
 	var directoriesSize []int
 	var files []string
 	var filesSize []int
-	var filesHash [][]byte
-	var fileschunksList []FileChunkHashList
+	var filesHash []FileHashList
+	var tempFileHash FileHashList
 	var filesMetaList ManifestDirectMetaList
+
 	err := filepath.Walk(dir,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -163,12 +162,13 @@ func processDirAndGenerateMeta(dir string) *FilesInfoList {
 			} else if info.Name() != appName {
 				files = append(files, path)
 				filesSize = append(filesSize, int(info.Size()))
-				filesHash = append(filesHash, []byte(hashFileAndEncoding(path)))
-				chunkshashes, err := getChunkHashes(path)
+				tempFileHash.FileHash = HashVariable{[]byte("base64,sha256"), []byte(hashFileAndEncoding(path))}
+				chunkshashes, err := getChunksHashes(path)
 				if err != nil {
 					return err
 				}
-				fileschunksList = append(fileschunksList, *chunkshashes)
+				tempFileHash.ChunksHashes = *chunkshashes
+				filesHash = append(filesHash, tempFileHash)
 
 				filesMetaList = append(filesMetaList, getFileMeta(path))
 			}
@@ -182,16 +182,15 @@ func processDirAndGenerateMeta(dir string) *FilesInfoList {
 	FilesAndDirectories.directoryNames = directories
 	FilesAndDirectories.fileNames = files
 	FilesAndDirectories.fileSizes = filesSize
-	FilesAndDirectories.fileHashes = filesHash
 	FilesAndDirectories.diretorySizes = directoriesSize
-	FilesAndDirectories.fileschunkslist = fileschunksList
+	FilesAndDirectories.filesHashlist = filesHash
 	FilesAndDirectories.filesMetaList = filesMetaList
 	return &FilesAndDirectories
 }
 
-func getChunkHashes(filepath string) (*FileChunkHashList, error) {
+func getChunksHashes(filepath string) (*[][]byte, error) {
 
-	var filechunks FileChunkHashList
+	var chunksHashes [][]byte
 
 	file, err := os.Open(filepath)
 	if err != nil {
@@ -216,12 +215,12 @@ func getChunkHashes(filepath string) (*FileChunkHashList, error) {
 		}
 
 		hs.Write(bf)
-		filechunks.ChunksHashes = append(filechunks.ChunksHashes, hs.Sum(nil))
+		chunksHashes = append(chunksHashes, hs.Sum(nil))
 		hs.Reset()
 
 	}
 
-	return &filechunks, nil
+	return &chunksHashes, nil
 }
 
 func getDirectorySize(directory string) (int, error) {
@@ -245,7 +244,7 @@ func printFilesInJson(fList *FilesInfoList, dirHeader *ManifestDirectoryHeader, 
 	var filemeta FileDataList
 
 	for indx, fn := range (*fList).fileNames {
-		fh := (*fList).fileHashes[indx]
+		fh := (*fList).filesHashlist[indx].FileHash.Hash
 		fs := (*fList).fileSizes[indx]
 		meta := (*fList).filesMetaList[indx]
 		fileInfo := FileData{fn, fs, fh, &meta}
@@ -284,14 +283,14 @@ func getManifestBody(fList *FilesInfoList) *ManifestDirectoryBody {
 
 	for indx, fname := range (*fList).fileNames {
 		fsize := (*fList).fileSizes[indx]
-		fhash := (*fList).fileHashes[indx]
+		fhash := (*fList).filesHashlist[indx]
 		fullname := currentDir + "/" + fname
 		paths, fileName := filepath.Split(fullname)
 		manifestFile := ManifestFile{
 			Path:       []byte(paths),
 			FileName:   []byte(fileName),
 			Size:       int64(fsize),
-			HashList:   HashValue{[]byte("base64,sha256"), fhash},
+			HashList:   fhash,
 			MetaString: []byte{},
 		}
 		result.FileList = append(result.FileList, manifestFile)
@@ -304,7 +303,7 @@ func getManifestBody(fList *FilesInfoList) *ManifestDirectoryBody {
 			Path:       []byte(fullDirname),
 			FileName:   nil,
 			Size:       int64(dirsize),
-			HashList:   HashValue{[]byte("base64,sha256"), nil},
+			HashList:   FileHashList{},
 			MetaString: []byte{},
 		}
 		result.FileList = append(result.FileList, manifestFile)

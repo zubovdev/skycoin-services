@@ -1,11 +1,20 @@
 package traceroute
 
 import (
+	"encoding/json"
 	"github.com/aeden/traceroute"
+	"github.com/skycoin/skycoin/src/cipher/encoder"
 	"time"
 )
 
-func Trace(in Input) (Result, error) {
+const (
+	// SerializeJSON result will be serialized to JSON.
+	SerializeJSON = iota
+	// SerializeByte result will be serialized by encoder.Serialize.
+	SerializeByte
+)
+
+func Trace(in Input, serializeType int) ([]byte, error) {
 	result := Result{StartTime: time.Now().Unix()}
 
 	opts := &traceroute.TracerouteOptions{}
@@ -16,7 +25,7 @@ func Trace(in Input) (Result, error) {
 
 	res, err := traceroute.Traceroute(in.DestinationIP, opts)
 	if err != nil {
-		return Result{}, err
+		return nil, err
 	}
 
 	for _, h := range res.Hops {
@@ -30,5 +39,16 @@ func Trace(in Input) (Result, error) {
 		})
 	}
 
-	return result, nil
+	var r []byte
+
+	switch serializeType {
+	case SerializeJSON:
+		r = encoder.Serialize(result)
+	case SerializeByte:
+		r, _ = json.Marshal(&result)
+	default:
+		panic("unknown serialization type")
+	}
+
+	return r, nil
 }

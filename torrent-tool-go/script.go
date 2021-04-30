@@ -20,12 +20,14 @@ func get_torrent_size(t string)float64{
 		fmt.Println(err)
 		return -1
 	}
+	
 
 	info,err := mi.UnmarshalInfo()
 	if err != nil{
 		fmt.Println(err)
 		return -1
 	}
+
 
 	var size float64 =0
 
@@ -35,9 +37,26 @@ func get_torrent_size(t string)float64{
 	return(float64(size/1073741824))
 }
 
+
+
 type Tor struct  {
 name string
 size float64
+}
+
+type file_details struct{
+	path string
+	size float64
+	hash string
+}
+
+func get_torrent_details(t string)file_details{
+	var fd file_details
+	fd.path = t
+	fd.size = get_torrent_size(t)
+	mi,_ := metainfo.LoadFromFile(t)
+	fd.hash = mi.HashInfoBytes().String()
+	return fd
 }
 
 func prepare_files_list(input_path string)[]Tor{
@@ -111,24 +130,18 @@ func copy_files(folders_list [][]string,input_path,output_path,limit string){
 }
 
 func main(){
-//go run script.go -d C:\\Users\\eee\\Desktop
-//\\torrent-sorting\\torrents -o C:\\Users\\eee\\Desktop\\torrent-sorting-go\\output -s 1TB -t 2
+// go run script.go -d C:\\Users\\eee\\Desktop
+// \\torrent-sorting\\torrents -o C:\\Users\\eee\\Desktop\\torrent-sorting-go\\output -s 1TB -t 2
 var input_path string
 var output_path string
 var folder_limit string
 var sort_type string
 var help string
+var sub_directory string
 flag.StringVar(&help, "help", "","Show help ")
 flag.StringVar(&help, "h","", "Show help-shorthand")
-if (help != ""){
-	fmt.Println("This script sorts and splits torrent file into separate size based directories\n"+
-	"[FLAGS]\n"+"[-h,--help]: Show help\n"+
-	"[-d,--directory]: Path to the input directory\n"+
-	"[-o,--output]: Path to the output directory\n"+
-	"[-s,--size]: Size limit in NGB or NTB\n"+
-	"[-t,--type]: Sort type, 1 sorts by size 2 sorts by name")
-	os.Exit(3)
-}
+flag.StringVar(&sub_directory,"sub-directory","","Path to torrent file to get it's details ")
+flag.StringVar(&sub_directory,"sb","","Path to torrent file to get it's details-shorthand ")
 flag.StringVar(&input_path, "directory", "","Path to the input directory")
 flag.StringVar(&input_path, "d","", "Path to the input directory-shorthand")
 flag.StringVar(&output_path, "output", "","Path to the output directory")
@@ -139,6 +152,22 @@ flag.StringVar(&sort_type, "type", "1","Sort type, 1 sorts by size 2 sorts by na
 flag.StringVar(&sort_type, "t","1", "Sort type, 1 sorts by size 2 sorts by name-shorthand")
 
 flag.Parse()
+if (help != ""){
+	fmt.Println("This script sorts and splits torrent file into separate size based directories\n"+
+	"[FLAGS]\n"+"[-h,--help]: Show help\n"+
+	"[-d,--directory]: Path to the input directory\n"+
+	"[-o,--output]: Path to the output directory\n"+
+	"[-s,--size]: Size limit in NGB or NTB\n"+
+	"[-t,--type]: Sort type, 1 sorts by size 2 sorts by name\n"+
+	"[-sb,--sub-directory: Path to torrent file to get it's details")
+	os.Exit(3)
+}
+if (sub_directory != ""){
+	fd := get_torrent_details(sub_directory)
+	fmt.Printf("%s,%f,%s\n",fd.path,fd.size*1073741824,fd.hash)
+	os.Exit(3)
+}
+
 var divisor = 1
 if (strings.Contains(strings.ToLower(folder_limit),"tb")){
 	divisor = 1000

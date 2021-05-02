@@ -141,6 +141,7 @@ func copy_files(folders_list [][]string,input_path,output_path,limit string){
 		}
 }
 
+
 func main(){
 // File Path example  C:\\Users\\eee\\Desktop\\skycoin-services\\torrent-tool-go\\torrents\\r_2477000.torrent
 // Directory path example C:\\Users\\eee\\Desktop\\torrent-sorting-go\\output 
@@ -155,7 +156,7 @@ flag.StringVar(&help, "help", "","Show help ")
 flag.StringVar(&help, "h","", "Show help-shorthand")
 flag.StringVar(&sub_directory,"sub-directory","","Path to torrent file to get it's details ")
 flag.StringVar(&sub_directory,"sb","","Path to torrent file to get it's details-shorthand ")
-flag.StringVar(&files_info_directory,"files_info","","Path to single torrent file to get each of it's files details")
+flag.StringVar(&files_info_directory,"files-info","","Path to single torrent file to get each of it's files details")
 flag.StringVar(&files_info_directory,"fi","","Path to single torrent file to get each of it's files details-shorthand")
 flag.StringVar(&input_path, "directory", "","Path to the input directory")
 flag.StringVar(&input_path, "d","", "Path to the input directory-shorthand")
@@ -167,16 +168,7 @@ flag.StringVar(&sort_type, "type", "1","Sort type, 1 sorts by size 2 sorts by na
 flag.StringVar(&sort_type, "t","1", "Sort type, 1 sorts by size 2 sorts by name-shorthand")
 
 flag.Parse()
-if (help != ""){
-	fmt.Println("This script sorts and splits torrent file into separate size based directories\n"+
-	"[FLAGS]\n"+"[-h,--help]: Show help\n"+
-	"[-d,--directory]: Path to the input directory\n"+
-	"[-o,--output]: Path to the output directory\n"+
-	"[-s,--size]: Size limit in NGB or NTB\n"+
-	"[-t,--type]: Sort type, 1 sorts by size 2 sorts by name\n"+
-	"[-sb,--sub-directory: Path to torrent file to get it's details")
-	os.Exit(3)
-}
+
 if (sub_directory != ""){
 	print_torrent_details(sub_directory)
 	os.Exit(3)

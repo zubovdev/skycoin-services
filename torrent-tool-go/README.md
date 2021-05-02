@@ -34,7 +34,11 @@ Sorting type of the torrents, 1 to sort by size and 2 to sort by name
 
 ### [-sb,--sub-directory]
 
-Takes a path to a single torrent file and prints file details Path/Name, size is bytes and hash
+Takes a path to a single torrent file and prints file details Path/Name, size in bytes and hash
+
+### [-fi,--files-info]
+
+Takes a path to a single torrent file and prints each of the torrent's files details Path/Name. size in bytes
 
 ## Usage
 
@@ -54,6 +58,14 @@ or
 $ go run script.go --sub-directory<value>
 ```
 
+Or
+
+```
+$ go run script.go -fi<value>
+or
+$ go run script.go  --file-details<value>
+```
+
 For example
 
 ```
@@ -66,4 +78,10 @@ Takes all torrents in directory input, sorts them by size and splits them into 2
 $ go run script.go -sb C:\\Users\\user\\Desktop\\torrents\\input\\tor1.torrent
 ```
 
-Gets the torrent called tor1 and prints it's Path/Name , size in bytes and hash as a single line comma sparated values
+Gets the torrent called tor1 and prints it's Path/Name , size in bytes and hash as a single line comma separated values
+
+```
+$ go run script.go -fi C:\\Users\\user\\Desktop\\torrents\\input\\tor1.torrent
+```
+
+Gets the torrent called tor1 and prints each of it's files Path/Name and size in bytes as a single line comma separated values

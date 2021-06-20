@@ -10,7 +10,10 @@ import (
 	"sync"
 )
 
-var pathVarName = "PATH"
+var (
+	pathVarName = "PATH"
+	pathVarSep  = ":"
+)
 
 type AppList map[string][]string
 

@@ -105,6 +105,16 @@ func main() {
 					},
 				},
 			},
+			&cli.Command{
+				Name:        "network-info",
+				Usage:       "Get information about the network",
+				UsageText:   "network-info [command options]",
+				Description: "Collects network information.",
+				Action:      actionNetworkInfo,
+				Flags: cli.FlagsByName{
+					jsonFlag,
+				},
+			},
 		},
 	}
 	if err := app.Run(os.Args); err != nil {
@@ -166,5 +176,10 @@ func actionTraceroute(c *cli.Context) error {
 	}
 
 	fmt.Println(result)
+	return nil
+}
+
+func actionNetworkInfo(c *cli.Context) error {
+	_, _ = cmd.GetNetworkInfo()
 	return nil
 }

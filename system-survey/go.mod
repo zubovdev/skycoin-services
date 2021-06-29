@@ -1,4 +1,4 @@
-module system-survey
+module github.com/zubovdev/skycoin-services/system-survey
 
 go 1.16
 

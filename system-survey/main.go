@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"github.com/aeden/traceroute"
 	"github.com/urfave/cli/v2"
+	"github.com/zubovdev/skycoin-services/system-survey/cmd"
 	"log"
 	"os"
-	"system-survey/cmd"
 )
 
 func main() {
